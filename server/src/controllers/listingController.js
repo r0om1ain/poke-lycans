@@ -13,6 +13,11 @@ const createSchema = z.object({
   description: z.string().max(2000).optional(),
 });
 
+const updateSchema = z.object({
+  price: z.number().positive().optional(),
+  quantity: z.number().int().positive().optional(),
+});
+
 export const listingController = {
   // Mise en vente classique (specs §19) : le vendeur choisit un produit du
   // catalogue puis renseigne les caractéristiques de SON exemplaire — toutes
@@ -42,14 +47,50 @@ export const listingController = {
     res.json({ listings: listings.map(serializeListing) });
   }),
 
+  // "Mes offres" (Stock/Offers) : mes annonces actives, filtrables comme le
+  // catalogue.
   mine: asyncHandler(async (req, res) => {
-    const { categoryId, page, pageSize } = req.query;
+    const { categoryId, seriesId, name, rarity, page, pageSize, minPrice, maxPrice, ...characteristics } = req.query;
     const result = await listingModel.findBySeller(req.user.id, {
       categoryId,
+      seriesId,
+      name,
+      rarity,
+      minPrice,
+      maxPrice,
+      ...characteristics,
       page: Number(page) || 1,
-      pageSize: Number(pageSize) || 24,
+      pageSize: Number(pageSize) || 50,
     });
     res.json({ ...result, items: result.items.map(serializeListing) });
+  }),
+
+  // Répartition de mes offres par catégorie et par série, pour la navigation
+  // de "Mes offres" (façon Cardmarket Stock/Offers).
+  myFacets: asyncHandler(async (req, res) => {
+    const [categoryCounts, seriesCounts] = await Promise.all([
+      listingModel.countsByCategoryForSeller(req.user.id),
+      listingModel.countsBySeriesForSeller(req.user.id, { categoryId: req.query.categoryId }),
+    ]);
+    res.json({ categoryCounts, seriesCounts });
+  }),
+
+  // Édition rapide du prix/quantité depuis "Mes offres" (tableau de gestion
+  // du stock, façon Cardmarket) — pas de changement des caractéristiques
+  // d'exemplaire ici, seulement les champs commerciaux de l'offre.
+  update: asyncHandler(async (req, res, next) => {
+    const listing = await listingModel.findById(req.params.id);
+    if (!listing) return next(notFound('Offre introuvable'));
+    if (listing.sellerId !== req.user.id) return next(forbidden());
+
+    const parsed = updateSchema.safeParse({
+      price: req.body.price !== undefined ? Number(req.body.price) : undefined,
+      quantity: req.body.quantity !== undefined ? Number(req.body.quantity) : undefined,
+    });
+    if (!parsed.success) return next(badRequest('Champs invalides', parsed.error.flatten()));
+
+    const updated = await listingModel.update(listing.id, parsed.data);
+    res.json({ listing: serializeListing(updated) });
   }),
 
   remove: asyncHandler(async (req, res, next) => {

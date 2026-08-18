@@ -34,10 +34,26 @@ export function formatCountdown(endAt) {
   return `${seconds}s`;
 }
 
+// Ordre qualité, du meilleur au pire (identique au serveur — voir
+// server/src/lib/characteristics.js).
+export const STATE_ORDER = ['MINT', 'NM', 'EXCELLENT', 'GOOD', 'LP', 'PLAYED', 'POOR'];
+
 export const STATE_LABELS = {
-  NM: 'NM',
+  MINT: 'Mint',
+  NM: 'Near Mint',
   EXCELLENT: 'Excellent',
   GOOD: 'Good',
-  LP: 'LP',
+  LP: 'Light Played',
   PLAYED: 'Played',
+  POOR: 'Poor',
+};
+
+export const STATE_SHORT_LABELS = {
+  MINT: 'MT',
+  NM: 'NM',
+  EXCELLENT: 'EX',
+  GOOD: 'GD',
+  LP: 'LP',
+  PLAYED: 'PL',
+  POOR: 'PO',
 };

@@ -1,17 +1,23 @@
-import { auctionsApi } from '../../api/auctions.js';
-import { useFetch } from '../../hooks/useApi.js';
-import { AuctionCard } from '../../components/auction/AuctionCard.jsx';
-import { LoadingBlock } from '../../components/common/Spinner.jsx';
-import { EmptyState } from '../../components/common/EmptyState.jsx';
+import { Link } from 'react-router-dom';
+import { auctionsApi } from '../api/auctions.js';
+import { useFetch } from '../hooks/useApi.js';
+import { AuctionCard } from '../components/auction/AuctionCard.jsx';
+import { LoadingBlock } from '../components/common/Spinner.jsx';
+import { EmptyState } from '../components/common/EmptyState.jsx';
 
-export function AccountAuctions() {
+export function MyAuctions() {
   const { data, loading } = useFetch(() => auctionsApi.mine(), []);
 
   if (loading) return <LoadingBlock />;
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 'var(--space-4)' }}>Mes enchères</h2>
+    <div className="page">
+      <nav className="breadcrumb">
+        <Link to="/">Accueil</Link>
+        <span>/</span>
+        <span>Mes enchères</span>
+      </nav>
+      <h1 className="page-title">Mes enchères</h1>
 
       <section className="section">
         <div className="section-header"><h3 className="section-title">Créées par moi</h3></div>

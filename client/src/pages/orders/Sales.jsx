@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ordersApi } from '../../api/orders.js';
 import { LoadingBlock } from '../../components/common/Spinner.jsx';
 import { EmptyState } from '../../components/common/EmptyState.jsx';
@@ -42,7 +43,8 @@ function SaleCard({ order, onChanged }) {
   );
 }
 
-export function AccountSales() {
+// Page indépendante, façon "/Orders/Sales/[Statut]" de Cardmarket.
+export function Sales() {
   const [tab, setTab] = useState('AWAITING_PAYMENT');
   const [orders, setOrders] = useState(null);
   const [counts, setCounts] = useState({});
@@ -57,8 +59,16 @@ export function AccountSales() {
   useEffect(load, [tab]);
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 'var(--space-4)' }}>Mes ventes</h2>
+    <div className="page">
+      <nav className="breadcrumb">
+        <Link to="/">Accueil</Link>
+        <span>/</span>
+        <span>Commandes</span>
+        <span>/</span>
+        <span>Mes ventes</span>
+      </nav>
+      <h1 className="page-title">Mes ventes</h1>
+
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t.key} className={`tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>

@@ -22,9 +22,22 @@ export const gradingCompanyModel = {
   },
 };
 
+// Ordre d'affichage logique (catalogue > singles > produits scellés), plutôt
+// que l'ordre alphabétique — les nouvelles catégories non listées ici
+// tombent à la fin, triées par nom.
+const CATEGORY_ORDER = ['card', 'booster', 'display', 'coffret', 'etb', 'other'];
+
 export const categoryModel = {
-  list() {
-    return prisma.productCategory.findMany({ orderBy: { name: 'asc' } });
+  async list() {
+    const categories = await prisma.productCategory.findMany({ orderBy: { name: 'asc' } });
+    return categories.sort((a, b) => {
+      const ia = CATEGORY_ORDER.indexOf(a.slug);
+      const ib = CATEGORY_ORDER.indexOf(b.slug);
+      if (ia === -1 && ib === -1) return a.name.localeCompare(b.name);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
   },
   findBySlug(slug) {
     return prisma.productCategory.findUnique({ where: { slug } });

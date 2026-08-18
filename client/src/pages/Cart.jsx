@@ -85,9 +85,18 @@ export function Cart() {
     if (user) accountApi.listAddresses().then((r) => setAddresses(r.addresses));
   }, [user]);
 
+  const breadcrumb = (
+    <nav className="breadcrumb">
+      <Link to="/">Accueil</Link>
+      <span>/</span>
+      <span>Panier</span>
+    </nav>
+  );
+
   if (!user) {
     return (
       <div className="page">
+        {breadcrumb}
         <EmptyState
           title="Connectez-vous pour voir votre panier"
           action={<Link to="/connexion" className="btn btn-primary">Se connecter</Link>}
@@ -99,10 +108,11 @@ export function Cart() {
   if (!loading && cart.sellers.length === 0) {
     return (
       <div className="page">
+        {breadcrumb}
         <EmptyState
-          title="Votre panier est vide"
+          title="Ton panier est vide"
           description="Parcourez la marketplace pour trouver votre bonheur."
-          action={<Link to="/recherche" className="btn btn-primary">Explorer</Link>}
+          action={<Link to="/recherche" className="btn btn-primary">Retour au marché</Link>}
         />
       </div>
     );
@@ -120,7 +130,7 @@ export function Cart() {
     try {
       await ordersApi.checkout({ addressId, shippingMethodBySeller: shippingBySeller });
       await refresh();
-      navigate('/compte/achats');
+      navigate('/achats');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Impossible de valider la commande');
     } finally {
@@ -130,6 +140,7 @@ export function Cart() {
 
   return (
     <div className="page">
+      {breadcrumb}
       <h1 className="page-title">Panier</h1>
 
       {cart.sellers.map((block) => (

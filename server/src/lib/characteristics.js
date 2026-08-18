@@ -27,7 +27,18 @@ export const EXEMPLAR_FIELDS = [
   ...GRADING_KEYS,
 ];
 
-const VALID_STATES = ['NM', 'EXCELLENT', 'GOOD', 'LP', 'PLAYED'];
+// Ordre qualité, du meilleur au pire (7 états Cardmarket : Mint, Near Mint,
+// Excellent, Good, Light Played, Played, Poor).
+const VALID_STATES = ['MINT', 'NM', 'EXCELLENT', 'GOOD', 'LP', 'PLAYED', 'POOR'];
+
+// Cardmarket ne filtre pas la recherche sur un état exact mais sur un seuil
+// "Condition min." : renvoie tous les états au moins aussi bons que celui
+// choisi.
+export function statesAtLeast(minState) {
+  const idx = VALID_STATES.indexOf(minState);
+  if (idx === -1) return undefined;
+  return VALID_STATES.slice(0, idx + 1);
+}
 
 function toBoolean(value) {
   if (typeof value === 'boolean') return value;
@@ -64,6 +75,13 @@ export function pickExemplarFields(source = {}) {
 
 // Construit un filtre Prisma `where` à partir de query params de recherche
 // (specs §12, §18, §39) : mêmes clés, valeurs ON/OFF, ids de lookup, ou texte.
+// `state` y est interprété comme "Condition min." (seuil), contrairement à
+// pickExemplarFields où il reste une valeur exacte (création d'une offre).
 export function buildExemplarWhere(query = {}) {
-  return pickExemplarFields(query);
+  const picked = pickExemplarFields(query);
+  if (picked.state) {
+    const states = statesAtLeast(picked.state);
+    if (states) picked.state = { in: states };
+  }
+  return picked;
 }

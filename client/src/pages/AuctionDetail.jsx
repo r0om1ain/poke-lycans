@@ -75,7 +75,7 @@ function FinalizePurchase({ auction }) {
         addressId,
         shippingMethodId: shippingMethodId || undefined,
       });
-      navigate(`/compte/achats`, { state: { orderId: order.id } });
+      navigate(`/achats`, { state: { orderId: order.id } });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Impossible de finaliser l’achat');
     } finally {

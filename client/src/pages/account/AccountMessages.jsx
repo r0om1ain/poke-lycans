@@ -160,34 +160,38 @@ export function AccountMessages() {
     messagesApi.conversations().then((r) => setConversations(r.conversations));
   }, []);
 
-  if (!conversations) return <LoadingBlock />;
-
-  if (conversations.length === 0) {
-    return <EmptyState title="Aucun message" description="Contactez un vendeur depuis une fiche produit pour démarrer une conversation." />;
-  }
-
   return (
-    <div className="messages-layout">
-      <div className="conversation-list">
-        {conversations.map((c) => (
-          <button
-            key={c.id}
-            className={`conversation-item ${c.id === conversationId ? 'active' : ''}`}
-            style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}
-            onClick={() => navigate(`/compte/messages/${c.id}`)}
-          >
-            <div className="conversation-item-name">{c.counterpart.username}</div>
-            <div className="conversation-item-preview">
-              {c.lastMessage ? (c.lastMessage.type === 'TEXT' ? c.lastMessage.content : `[${c.lastMessage.type}]`) : 'Nouvelle conversation'}
-            </div>
-          </button>
-        ))}
-      </div>
-      {conversationId ? (
-        <ChatPanel conversationId={conversationId} />
+    <div>
+      <h2 style={{ marginBottom: 'var(--space-4)' }}>Mes messages</h2>
+
+      {!conversations ? (
+        <LoadingBlock />
+      ) : conversations.length === 0 ? (
+        <EmptyState title="Aucun message" description="Contactez un vendeur depuis une fiche produit pour démarrer une conversation." />
       ) : (
-        <div className="chat-panel" style={{ alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
-          <span style={{ color: 'var(--text-muted)' }}>Sélectionnez une conversation</span>
+        <div className="messages-layout">
+          <div className="conversation-list">
+            {conversations.map((c) => (
+              <button
+                key={c.id}
+                className={`conversation-item ${c.id === conversationId ? 'active' : ''}`}
+                style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={() => navigate(`/compte/messages/${c.id}`)}
+              >
+                <div className="conversation-item-name">{c.counterpart.username}</div>
+                <div className="conversation-item-preview">
+                  {c.lastMessage ? (c.lastMessage.type === 'TEXT' ? c.lastMessage.content : `[${c.lastMessage.type}]`) : 'Nouvelle conversation'}
+                </div>
+              </button>
+            ))}
+          </div>
+          {conversationId ? (
+            <ChatPanel conversationId={conversationId} />
+          ) : (
+            <div className="chat-panel" style={{ alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Sélectionnez une conversation</span>
+            </div>
+          )}
         </div>
       )}
     </div>

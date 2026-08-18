@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { uploadUrl } from '../../api/client.js';
 import { SeriesLabel } from './SeriesLabel.jsx';
 import { formatPrice } from '../../lib/format.js';
+import { productUrl } from '../../lib/productUrl.js';
 
 // price : prix exact à afficher tel quel (ex. une offre précise). Si absent,
 // on retombe sur product.fromPrice ("À partir de X €", comme Cardmarket).
@@ -9,7 +10,7 @@ export function ProductCard({ product, price }) {
   const hasFromPrice = product.fromPrice !== undefined && product.fromPrice !== null;
 
   return (
-    <Link to={`/produits/${product.id}`} className="product-card">
+    <Link to={productUrl(product)} className="product-card">
       <div className="product-card-img">
         {product.imageUrl ? (
           <img src={uploadUrl(product.imageUrl)} alt={product.name} loading="lazy" />

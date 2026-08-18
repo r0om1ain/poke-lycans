@@ -50,7 +50,7 @@ export function ExemplarFormFields({ value, onChange }) {
         </select>
       </div>
 
-      <div className="field">
+      <div className="field quick-panel__span">
         <label>Caractéristiques</label>
         {CHARACTERISTICS.map(({ key, label }) => (
           <label key={key} className="checkbox-row">

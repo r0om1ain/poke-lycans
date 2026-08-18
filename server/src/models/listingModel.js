@@ -27,13 +27,33 @@ export const listingModel = {
     return prisma.listing.count({ where: { productId, status: 'ACTIVE' } });
   },
 
-  // Offres actives d'un vendeur, éventuellement filtrées par catégorie (§23-24)
-  async findBySeller(sellerId, { categoryId, page = 1, pageSize = 24 } = {}) {
+  // "Mes offres" (Stock/Offers) : offres actives d'un vendeur, filtrables
+  // comme le catalogue (nom, catégorie, série, prix, caractéristiques) —
+  // même logique que productModel.search mais directement sur Listing
+  // puisque les champs d'exemplaire y vivent déjà.
+  async findBySeller(
+    sellerId,
+    { categoryId, seriesId, name, rarity, minPrice, maxPrice, page = 1, pageSize = 50, ...characteristics } = {},
+  ) {
     const where = {
       sellerId,
       status: 'ACTIVE',
-      ...(categoryId ? { product: { categoryId } } : {}),
+      ...buildExemplarWhere(characteristics),
     };
+    if (categoryId || seriesId || name || rarity) {
+      where.product = {
+        ...(categoryId ? { categoryId } : {}),
+        ...(seriesId ? { seriesId } : {}),
+        ...(rarity ? { rarity } : {}),
+        ...(name ? { name: { contains: name, mode: 'insensitive' } } : {}),
+      };
+    }
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.price = {};
+      if (minPrice !== undefined) where.price.gte = Number(minPrice);
+      if (maxPrice !== undefined) where.price.lte = Number(maxPrice);
+    }
+
     const [items, total] = await Promise.all([
       prisma.listing.findMany({
         where,
@@ -47,7 +67,8 @@ export const listingModel = {
     return { items, total, page, pageSize };
   },
 
-  // Nombre d'offres actives par catégorie de produit pour un vendeur (§23)
+  // Nombre d'offres actives par catégorie de produit pour un vendeur (§23,
+  // repris pour "Mes offres" façon Cardmarket Stock/Offers)
   async countsByCategoryForSeller(sellerId) {
     const listings = await prisma.listing.findMany({
       where: { sellerId, status: 'ACTIVE' },
@@ -60,6 +81,29 @@ export const listingModel = {
       counts[slug].count += 1;
     }
     return counts;
+  },
+
+  // Nombre d'offres actives par série, pour la navigation de "Mes offres"
+  // (façon Cardmarket : liste des extensions avec le nombre d'articles dans
+  // chacune).
+  async countsBySeriesForSeller(sellerId, { categoryId } = {}) {
+    const listings = await prisma.listing.findMany({
+      where: { sellerId, status: 'ACTIVE', ...(categoryId ? { product: { categoryId } } : {}) },
+      select: { product: { select: { series: { select: { id: true, code: true, name: true } } } } },
+    });
+    const counts = new Map();
+    for (const l of listings) {
+      const series = l.product.series;
+      if (!series) continue;
+      const entry = counts.get(series.id) ?? { id: series.id, label: `${series.code} : ${series.name}`, count: 0 };
+      entry.count += 1;
+      counts.set(series.id, entry);
+    }
+    return [...counts.values()].sort((a, b) => a.label.localeCompare(b.label));
+  },
+
+  update(id, data) {
+    return prisma.listing.update({ where: { id }, data, include: fullInclude });
   },
 
   updateStatus(id, status) {

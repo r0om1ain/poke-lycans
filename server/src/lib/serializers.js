@@ -1,4 +1,5 @@
 import { serializeSeries } from './formatSeries.js';
+import { productSlug } from './slug.js';
 
 export function serializeUserPublic(user, stats) {
   if (!user) return null;
@@ -47,6 +48,7 @@ export function serializeProduct(product) {
   if (!product) return null;
   return {
     id: product.id,
+    slug: productSlug(product),
     category: serializeCategory(product.category),
     name: product.name,
     cardNumber: product.cardNumber,

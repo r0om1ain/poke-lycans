@@ -103,6 +103,11 @@ ol {
   }
 }
 
+.container {
+  width: min(var(--content-max), calc(100% - 32px));
+  margin-inline: auto;
+}
+
 .page {
   width: 100%;
   max-width: var(--content-max);
@@ -183,6 +188,14 @@ ol {
   font-size: 0.82rem;
 }
 
+.input-xs {
+  width: 58px;
+  min-height: 28px;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  text-align: right;
+}
+
 .btn-block {
   width: 100%;
 }
@@ -211,12 +224,31 @@ ol {
   padding: 10px 12px;
   color: var(--text);
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: var(--text-muted);
 }
 .input:focus,
 .select:focus,
 .textarea:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a9afba' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.select:hover {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23f0f1f4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 .textarea {
   resize: vertical;
@@ -242,9 +274,10 @@ ol {
 
 .card {
   background: var(--bg-elevated);
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
 }
 
 .section {
@@ -358,6 +391,17 @@ ol {
   background: var(--bg-elevated-2);
   color: var(--text-secondary);
 }
+
+.badge-state {
+  color: #fff;
+}
+.badge-state-mint { background: var(--state-mint); }
+.badge-state-nm { background: var(--state-nm); }
+.badge-state-excellent { background: var(--state-excellent); }
+.badge-state-good { background: var(--state-good); }
+.badge-state-lp { background: var(--state-lp); }
+.badge-state-played { background: var(--state-played); }
+.badge-state-poor { background: var(--state-poor); }
 
 /* ── Empty / loading / error states ──────────────────── */
 

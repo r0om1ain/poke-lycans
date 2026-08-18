@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { auctionsApi } from '../api/auctions.js';
+import { catalogApi } from '../api/catalog.js';
 import { AuctionCard } from '../components/auction/AuctionCard.jsx';
-import { FilterPanel } from '../components/filters/FilterPanel.jsx';
+import { FilterSidebar } from '../components/filters/FilterSidebar.jsx';
 import { LoadingBlock } from '../components/common/Spinner.jsx';
 import { EmptyState, ErrorState } from '../components/common/EmptyState.jsx';
+
+function paginationRange(page, totalPages) {
+  const pages = new Set([1, totalPages, page, page - 1, page + 1]);
+  return [...pages].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+}
 
 export function Auctions() {
   const [searchParams] = useSearchParams();
@@ -16,9 +22,17 @@ export function Auctions() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [series, setSeries] = useState([]);
 
   useEffect(() => setName(nameFromUrl), [nameFromUrl]);
   useEffect(() => setPage(1), [filters, name]);
+
+  useEffect(() => {
+    catalogApi.categories().then((r) => setCategories(r.categories));
+    catalogApi.series().then((r) => setSeries(r.series));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,51 +48,96 @@ export function Auctions() {
     };
   }, [filters, name, page]);
 
+  const totalPages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
+
   return (
-    <div className="page">
-      <nav className="breadcrumb">
-        <Link to="/">Accueil</Link>
-        <span>/</span>
-        <span>Enchères</span>
-      </nav>
-      <h1 className="page-title">Enchères</h1>
+    <div className="catalog-page">
+      <div className="container catalog-main">
+        <nav className="breadcrumb">
+          <Link to="/">Accueil</Link>
+          <span>/</span>
+          <span>Enchères</span>
+        </nav>
 
-      <FilterPanel filters={filters} onChange={setFilters} nameValue={name} onNameChange={setName} />
-
-      {loading && <LoadingBlock />}
-      {!loading && error && <ErrorState message={error.message} />}
-      {!loading && !error && result && (
-        <>
-          <div className="results-toolbar">
-            <span>{result.total} enchère{result.total > 1 ? 's' : ''} en cours — tri par fin la plus proche</span>
+        <div className="catalog-heading">
+          <div>
+            <h1>Enchères</h1>
+            <p>Enchères en cours, triées par fin la plus proche.</p>
           </div>
+        </div>
 
-          {result.items.length === 0 ? (
-            <EmptyState title="Aucune enchère en cours" description="Revenez plus tard ou modifiez vos filtres." />
-          ) : (
-            <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
-              {result.items.map((a) => (
-                <AuctionCard key={a.id} auction={a} />
+        <section className="catalog-toolbar">
+          <label className="catalog-select">
+            <span>Catégorie</span>
+            <select className="select" value={filters.categoryId ?? ''} onChange={(e) => setFilters((f) => ({ ...f, categoryId: e.target.value || undefined }))}>
+              <option value="">Toutes</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </div>
-          )}
+            </select>
+          </label>
+          <label className="catalog-select">
+            <span>Édition</span>
+            <select className="select" value={filters.seriesId ?? ''} onChange={(e) => setFilters((f) => ({ ...f, seriesId: e.target.value || undefined }))}>
+              <option value="">Toutes les extensions</option>
+              {series.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="catalog-search">
+            <span>Nom</span>
+            <input className="input" type="search" placeholder="Ex. Pikachu" value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <button type="button" className="btn btn-primary filter-action" onClick={() => setMobileFiltersOpen((v) => !v)}>Filtres</button>
+        </section>
 
-          {result.total > result.pageSize && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-6)' }}>
-              <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                Précédent
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                disabled={page * result.pageSize >= result.total}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Suivant
-              </button>
-            </div>
-          )}
-        </>
-      )}
+        <button type="button" className="btn btn-secondary catalog-mobile-toggle" onClick={() => setMobileFiltersOpen((v) => !v)}>
+          Filtres avancés {mobileFiltersOpen ? '▲' : '▼'}
+        </button>
+
+        <div className="catalog-layout">
+          <FilterSidebar filters={filters} onChange={setFilters} showPrice={false} className={mobileFiltersOpen ? 'open' : ''} />
+
+          <section className="catalog-results">
+            {loading && <LoadingBlock />}
+            {!loading && error && <ErrorState message={error.message} />}
+            {!loading && !error && result && (
+              <>
+                <div className="results-bar">
+                  <div className="results-bar-info">
+                    <strong>{result.total} enchère{result.total > 1 ? 's' : ''} en cours</strong>
+                    <span>Tri par fin la plus proche</span>
+                  </div>
+                </div>
+
+                {result.items.length === 0 ? (
+                  <EmptyState title="Aucune enchère en cours" description="Revenez plus tard ou modifiez vos filtres." />
+                ) : (
+                  <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
+                    {result.items.map((a) => (
+                      <AuctionCard key={a.id} auction={a} />
+                    ))}
+                  </div>
+                )}
+
+                {totalPages > 1 && (
+                  <nav className="pagination" aria-label="Pagination">
+                    <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
+                    {paginationRange(page, totalPages).map((p, i, arr) => (
+                      <span key={p} style={{ display: 'contents' }}>
+                        {i > 0 && arr[i - 1] !== p - 1 && <span>…</span>}
+                        <button type="button" className={p === page ? 'is-active' : ''} onClick={() => setPage(p)}>{p}</button>
+                      </span>
+                    ))}
+                    <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>›</button>
+                  </nav>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

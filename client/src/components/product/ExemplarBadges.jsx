@@ -1,4 +1,4 @@
-import { STATE_LABELS } from '../../lib/format.js';
+import { STATE_SHORT_LABELS } from '../../lib/format.js';
 
 const CHARACTERISTIC_LABELS = {
   holo: 'Holo',
@@ -15,7 +15,10 @@ export function ExemplarBadges({ item, compact = false }) {
   if (!item) return null;
   const badges = [];
 
-  if (item.state) badges.push(<span key="state" className="badge badge-neutral">{STATE_LABELS[item.state] ?? item.state}</span>);
+  if (item.state) {
+    const cls = `badge badge-state badge-state-${item.state.toLowerCase()}`;
+    badges.push(<span key="state" className={cls}>{STATE_SHORT_LABELS[item.state] ?? item.state}</span>);
+  }
   if (item.language) badges.push(<span key="lang" className="badge badge-neutral">{item.language.name}</span>);
 
   for (const [key, label] of Object.entries(CHARACTERISTIC_LABELS)) {

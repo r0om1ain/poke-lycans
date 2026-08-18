@@ -15,11 +15,13 @@ enum Role {
 }
 
 enum CardState {
+  MINT
   NM
   EXCELLENT
   GOOD
   LP
   PLAYED
+  POOR
 }
 
 enum ListingStatus {

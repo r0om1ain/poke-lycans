@@ -93,7 +93,9 @@ function OrderCard({ order, onChanged }) {
   );
 }
 
-export function AccountPurchases() {
+// Page indépendante (pas nichée dans "Mon compte"), comme les pages
+// Commandes du gabarit fourni (fil d'ariane "Accueil / Commandes / Mes achats").
+export function Purchases() {
   const { cart } = useCart();
   const [tab, setTab] = useState('AWAITING_PAYMENT');
   const [orders, setOrders] = useState(null);
@@ -115,8 +117,16 @@ export function AccountPurchases() {
   useEffect(load, [tab]);
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 'var(--space-4)' }}>Mes achats</h2>
+    <div className="page">
+      <nav className="breadcrumb">
+        <Link to="/">Accueil</Link>
+        <span>/</span>
+        <span>Commandes</span>
+        <span>/</span>
+        <span>Mes achats</span>
+      </nav>
+      <h1 className="page-title">Mes achats</h1>
+
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t.key} className={`tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>
