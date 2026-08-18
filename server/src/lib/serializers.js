@@ -53,6 +53,7 @@ export function serializeProduct(product) {
     rarity: product.rarity,
     imageUrl: product.imageUrl,
     series: serializeSeries(product.series),
+    fromPrice: product.fromPrice ?? undefined,
   };
 }
 

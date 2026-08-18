@@ -1,29 +1,93 @@
-/* ── Filters ──────────────────────────────────────────── */
+/* ── Filters (barre horizontale façon Cardmarket) ────────── */
 
-.search-layout {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-6);
-}
-@media (min-width: 900px) {
-  .search-layout {
-    grid-template-columns: 240px 1fr;
-    align-items: start;
-  }
+.filter-bar {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-5);
 }
 
-.filter-panel {
+.filter-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.filter-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: 4px;
+  min-width: 160px;
 }
+.filter-field-grow {
+  flex: 1;
+  min-width: 220px;
+}
+.filter-field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.filter-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+.filter-checkboxes .checkbox-row {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.filter-find-btn {
+  height: 38px;
+  padding: 0 var(--space-6);
+}
+
+.filter-more-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-3);
+  background: none;
+  border: none;
+  color: var(--link);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.filter-active-count {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 7px;
+}
+
+.filter-more-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-soft);
+}
+
 .filter-group {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 180px;
 }
 .filter-group-title {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -47,72 +111,55 @@
 .filter-chip.active {
   background: var(--accent-soft);
   border-color: var(--accent);
-  color: var(--accent-hover);
+  color: var(--link);
 }
-.filter-toggle-row {
+
+.sort-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
   font-size: 0.85rem;
+  font-weight: 700;
   color: var(--text-secondary);
 }
-.switch {
-  position: relative;
-  width: 38px;
-  height: 22px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.switch.on {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.switch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.15s ease;
-}
-.switch.on::after {
-  transform: translateX(16px);
+.sort-row .select {
+  width: auto;
 }
 
 .results-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   margin-bottom: var(--space-4);
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
-
-.mobile-filter-toggle {
-  display: inline-flex;
-  margin-bottom: var(--space-4);
+.results-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
-@media (min-width: 900px) {
-  .mobile-filter-toggle {
-    display: none;
-  }
+.view-toggle {
+  display: flex;
+  gap: 4px;
 }
-.filter-panel-wrap {
-  display: none;
+.view-toggle button {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
 }
-.filter-panel-wrap.open {
-  display: block;
-}
-@media (min-width: 900px) {
-  .filter-panel-wrap {
-    display: block;
-  }
+.view-toggle button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--link);
 }
 
 /* ── Auctions ─────────────────────────────────────────── */

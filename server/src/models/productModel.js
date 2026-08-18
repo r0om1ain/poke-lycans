@@ -3,6 +3,20 @@ import { buildExemplarWhere } from '../lib/characteristics.js';
 
 const withRelations = { series: true, category: true };
 
+// Attache `fromPrice` (prix minimum parmi les offres actives) à chaque
+// produit — affiché "À partir de X €" sur les cartes produit, comme sur
+// Cardmarket.
+async function withMinPrice(products) {
+  if (products.length === 0) return products;
+  const rows = await prisma.listing.groupBy({
+    by: ['productId'],
+    where: { productId: { in: products.map((p) => p.id) }, status: 'ACTIVE' },
+    _min: { price: true },
+  });
+  const minByProduct = new Map(rows.map((r) => [r.productId, r._min.price]));
+  return products.map((p) => ({ ...p, fromPrice: minByProduct.get(p.id) ?? null }));
+}
+
 export const productModel = {
   findById(id) {
     return prisma.product.findUnique({ where: { id }, include: withRelations });
@@ -12,13 +26,27 @@ export const productModel = {
     return prisma.product.update({ where: { id }, data: { viewCount: { increment: 1 } } }).catch(() => null);
   },
 
+  // Produits pour une liste d'ids donnée, en préservant l'ordre demandé —
+  // utilisé pour "Vus récemment" (suivi côté client, localStorage).
+  async byIds(ids) {
+    if (!ids || ids.length === 0) return [];
+    const products = await prisma.product.findMany({ where: { id: { in: ids } }, include: withRelations });
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return withMinPrice(ids.map((id) => byId.get(id)).filter(Boolean));
+  },
+
   // Recherche catalogue (specs §12-13) : catégorie, série, nom, + caractéristiques
   // facultatives qui filtrent sur les offres actives correspondantes.
-  async search({ categoryId, seriesId, name, page = 1, pageSize = 24, ...characteristics } = {}) {
+  async search({ categoryId, seriesId, name, exact, availableOnly, page = 1, pageSize = 24, ...characteristics } = {}) {
     const where = {};
     if (categoryId) where.categoryId = categoryId;
     if (seriesId) where.seriesId = seriesId;
-    if (name) where.name = { contains: name, mode: 'insensitive' };
+    if (name) {
+      where.name = exact === 'true' || exact === true ? { equals: name, mode: 'insensitive' } : { contains: name, mode: 'insensitive' };
+    }
+    if (availableOnly === 'true' || availableOnly === true) {
+      where.listings = { some: { status: 'ACTIVE' } };
+    }
 
     const exemplarWhere = buildExemplarWhere(characteristics);
     if (Object.keys(exemplarWhere).length > 0) {
@@ -36,19 +64,21 @@ export const productModel = {
       prisma.product.count({ where }),
     ]);
 
-    return { items, total, page, pageSize };
+    return { items: await withMinPrice(items), total, page, pageSize };
   },
 
-  newest(limit = 8) {
-    return prisma.product.findMany({ include: withRelations, orderBy: { createdAt: 'desc' }, take: limit });
+  async newest(limit = 8) {
+    const items = await prisma.product.findMany({ include: withRelations, orderBy: { createdAt: 'desc' }, take: limit });
+    return withMinPrice(items);
   },
 
-  mostViewed(limit = 8) {
-    return prisma.product.findMany({
+  async mostViewed(limit = 8) {
+    const items = await prisma.product.findMany({
       include: withRelations,
       orderBy: { viewCount: 'desc' },
       take: limit,
     });
+    return withMinPrice(items);
   },
 
   // "Best-sellers" (specs §11) : produits les plus présents dans des OrderItem.
@@ -65,7 +95,7 @@ export const productModel = {
       include: withRelations,
     });
     const byId = new Map(products.map((p) => [p.id, p]));
-    return rows.map((r) => byId.get(r.productId)).filter(Boolean);
+    return withMinPrice(rows.map((r) => byId.get(r.productId)).filter(Boolean));
   },
 
   // "Dernières mises en vente" (specs §11) : produits ayant reçu une offre récente.
@@ -84,6 +114,6 @@ export const productModel = {
       products.push(listing.product);
       if (products.length >= limit) break;
     }
-    return products;
+    return withMinPrice(products);
   },
 };

@@ -26,6 +26,12 @@ img {
   display: block;
 }
 
+svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -250,17 +256,73 @@ ol {
   align-items: baseline;
   justify-content: space-between;
   margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .section-title {
   font-size: 1.05rem;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title svg {
+  color: var(--text-muted);
 }
 
 .section-link {
   font-size: 0.85rem;
-  color: var(--accent);
+  color: var(--link);
   font-weight: 600;
+}
+
+/* ── Rangée à défilement horizontal (accueil) ─────────── */
+
+.scroll-row-wrap {
+  position: relative;
+}
+.scroll-row {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  padding-bottom: 4px;
+}
+.scroll-row::-webkit-scrollbar {
+  height: 6px;
+}
+.scroll-row > * {
+  scroll-snap-align: start;
+  flex: 0 0 152px;
+}
+.scroll-arrow {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  z-index: 2;
+}
+@media (min-width: 900px) {
+  .scroll-arrow {
+    display: flex;
+  }
+}
+.scroll-arrow.left {
+  left: -14px;
+}
+.scroll-arrow.right {
+  right: -14px;
 }
 
 /* ── Badges ───────────────────────────────────────────── */
@@ -330,7 +392,7 @@ ol {
 .grid-products {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 @media (min-width: 640px) {
   .grid-products {
@@ -339,8 +401,7 @@ ol {
 }
 @media (min-width: 1024px) {
   .grid-products {
-    grid-template-columns: repeat(5, 1fr);
-    gap: var(--space-4);
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 

@@ -11,6 +11,7 @@ import { SeriesLabel } from '../components/product/SeriesLabel.jsx';
 import { ListingRow } from '../components/product/ListingRow.jsx';
 import { LoadingBlock } from '../components/common/Spinner.jsx';
 import { EmptyState, ErrorState } from '../components/common/EmptyState.jsx';
+import { pushRecentlyViewed } from '../lib/recentlyViewed.js';
 
 export function ProductDetail() {
   const { id } = useParams();
@@ -22,6 +23,10 @@ export function ProductDetail() {
   const [listings, setListings] = useState(null);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [addingId, setAddingId] = useState(null);
+
+  useEffect(() => {
+    pushRecentlyViewed(id);
+  }, [id]);
 
   useEffect(() => {
     setListingsLoading(true);

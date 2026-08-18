@@ -5,6 +5,7 @@ const router = Router();
 
 router.get('/home', catalogController.home);
 router.get('/search', catalogController.search);
+router.get('/products-by-ids', catalogController.byIds);
 router.get('/products/:id', catalogController.productDetail);
 router.get('/series', catalogController.series);
 router.get('/categories', catalogController.categories);

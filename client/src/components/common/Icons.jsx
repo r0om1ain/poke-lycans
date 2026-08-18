@@ -57,3 +57,30 @@ export const MessageIcon = (p) => (
     <path d="M4 5h16v11H8l-4 4V5Z" />
   </svg>
 );
+
+export const EyeIcon = (p) => (
+  <svg {...common} {...p}>
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+export const TrendIcon = (p) => (
+  <svg {...common} {...p}>
+    <path d="m3 17 6-6 4 4 8-8" />
+    <path d="M15 7h6v6" />
+  </svg>
+);
+
+export const SparkleIcon = (p) => (
+  <svg {...common} {...p}>
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" />
+  </svg>
+);
+
+export const TagIcon = (p) => (
+  <svg {...common} {...p}>
+    <path d="M12 3h6a2 2 0 0 1 2 2v6l-9 9-8-8 9-9Z" />
+    <circle cx="15.5" cy="7.5" r="1.2" />
+  </svg>
+);

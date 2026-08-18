@@ -49,6 +49,14 @@ export const catalogController = {
     res.json({ ...result, items: result.items.map(serializeProduct) });
   }),
 
+  // "Vus récemment" — le suivi se fait côté client (localStorage), l'API se
+  // contente de résoudre une liste d'ids en fiches produit.
+  byIds: asyncHandler(async (req, res) => {
+    const ids = (req.query.ids ?? '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 20);
+    const products = await productModel.byIds(ids);
+    res.json({ items: products.map(serializeProduct) });
+  }),
+
   // Fiche produit (specs §14-15)
   productDetail: asyncHandler(async (req, res, next) => {
     const product = await productModel.findById(req.params.id);

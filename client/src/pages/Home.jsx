@@ -3,24 +3,32 @@ import { catalogApi } from '../api/catalog.js';
 import { useFetch } from '../hooks/useApi.js';
 import { ProductCard } from '../components/product/ProductCard.jsx';
 import { AuctionCard } from '../components/auction/AuctionCard.jsx';
+import { ScrollRow } from '../components/common/ScrollRow.jsx';
 import { LoadingBlock } from '../components/common/Spinner.jsx';
 import { ErrorState, EmptyState } from '../components/common/EmptyState.jsx';
+import { TrendIcon, EyeIcon, SparkleIcon, TagIcon, GavelIcon } from '../components/common/Icons.jsx';
+import { getRecentlyViewed } from '../lib/recentlyViewed.js';
 
-function ProductSection({ title, items, linkTo }) {
+function ProductSection({ title, icon: Icon, items, linkTo }) {
   if (!items || items.length === 0) return null;
   return (
     <section className="section">
       <div className="section-header">
-        <h2 className="section-title">{title}</h2>
+        <h2 className="section-title"><Icon /> {title}</h2>
         {linkTo && <Link to={linkTo} className="section-link">Tout voir</Link>}
       </div>
-      <div className="grid-products">
+      <ScrollRow>
         {items.map((p) => (
           <ProductCard key={p.id} product={p} />
         ))}
-      </div>
+      </ScrollRow>
     </section>
   );
+}
+
+function RecentlyViewedSection() {
+  const { data: items } = useFetch(() => catalogApi.byIds(getRecentlyViewed()), []);
+  return <ProductSection title="Vus précédemment" icon={EyeIcon} items={items?.items} linkTo={null} />;
 }
 
 export function Home() {
@@ -46,18 +54,20 @@ export function Home() {
         />
       )}
 
-      <ProductSection title="Best-sellers" items={data.bestSellers} linkTo="/recherche" />
-      <ProductSection title="Les plus vus" items={data.mostViewed} linkTo="/recherche" />
-      <ProductSection title="Nouveautés" items={data.newest} linkTo="/recherche" />
-      <ProductSection title="Dernières mises en vente" items={data.recentlyListed} linkTo="/recherche" />
+      <RecentlyViewedSection />
+
+      <ProductSection title="Best-sellers" icon={TrendIcon} items={data.bestSellers} linkTo="/recherche" />
+      <ProductSection title="Les plus vus" icon={EyeIcon} items={data.mostViewed} linkTo="/recherche" />
+      <ProductSection title="Nouveautés" icon={SparkleIcon} items={data.newest} linkTo="/recherche" />
+      <ProductSection title="Dernières mises en vente" icon={TagIcon} items={data.recentlyListed} linkTo="/recherche" />
 
       {data.endingSoonAuctions.length > 0 && (
         <section className="section">
           <div className="section-header">
-            <h2 className="section-title">Enchères se terminant bientôt</h2>
+            <h2 className="section-title"><GavelIcon /> Enchères se terminant bientôt</h2>
             <Link to="/encheres" className="section-link">Toutes les enchères</Link>
           </div>
-          <div className="row-list" style={{ display: 'grid', gap: 'var(--space-3)', background: 'transparent', border: 'none' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
             {data.endingSoonAuctions.map((a) => (
               <AuctionCard key={a.id} auction={a} />
             ))}
