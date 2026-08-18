@@ -1,0 +1,559 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────
+
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+enum CardState {
+  NM
+  EXCELLENT
+  GOOD
+  LP
+  PLAYED
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  REMOVED
+}
+
+enum AuctionStatus {
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+enum OrderStatus {
+  AWAITING_PAYMENT
+  PAID
+  SHIPPED
+  DELIVERED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  OFFER
+}
+
+enum PriceOfferStatus {
+  PENDING
+  ACCEPTED
+  REFUSED
+  EXPIRED
+  USED
+}
+
+enum ReviewRating {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+// ── Users ──────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  country      String?
+  role         Role     @default(CLIENT)
+  createdAt    DateTime @default(now())
+
+  addresses       Address[]
+  paymentMethods  PaymentMethod[]
+  shippingMethods ShippingMethod[]
+  listings        Listing[]
+  bids            Bid[]
+  collectionItems CollectionItem[]
+  cartItems       CartItem[]
+
+  auctions    Auction[] @relation("AuctionSeller")
+  auctionsWon Auction[] @relation("AuctionWinner")
+
+  ordersAsBuyer  Order[] @relation("BuyerOrders")
+  ordersAsSeller Order[] @relation("SellerOrders")
+
+  conversationsAsBuyer  Conversation[] @relation("BuyerConversations")
+  conversationsAsSeller Conversation[] @relation("SellerConversations")
+  messages              Message[]
+
+  priceOffersMade     PriceOffer[] @relation("PriceOffersMade")
+  priceOffersReceived PriceOffer[] @relation("PriceOffersReceived")
+
+  reviewsAuthored Review[] @relation("ReviewsAuthored")
+  reviewsReceived Review[] @relation("ReviewsReceived")
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  recipient String
+  line1     String
+  line2     String?
+  city      String
+  zip       String
+  country   String
+  phone     String?
+  isDefault Boolean @default(false)
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+}
+
+model PaymentMethod {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // "card", "paypal", ...
+  label     String
+  last4     String?
+  expMonth  Int?
+  expYear   Int?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  payments Payment[]
+}
+
+// Frais de livraison définis par vendeur (specs §35-36 : mode de livraison,
+// frais de livraison, total vendeur). Sans ça le panier ne peut pas afficher
+// un choix de mode de livraison par bloc vendeur.
+model ShippingMethod {
+  id        String   @id @default(cuid())
+  sellerId  String
+  seller    User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  name      String // "Mondial Relay", "Colissimo", "Lettre suivie"
+  price     Decimal  @db.Decimal(10, 2)
+  country   String? // null = valable pour tous les pays
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  orders Order[]
+
+  @@index([sellerId])
+}
+
+// ── Lookups gérables (admin) ───────────────────────────
+// Évite les chaînes libres divergentes ("PSA"/"Psa"/"psa", "Français"/"fr")
+// qui casseraient les filtres et l'estimation de valeur (specs §50).
+
+model Language {
+  id   String @id @default(cuid())
+  code String @unique // "fr", "en", "jp"
+  name String // "Français"
+
+  listings        Listing[]
+  auctions        Auction[]
+  collectionItems CollectionItem[]
+  orderItems      OrderItem[]
+}
+
+model GradingCompany {
+  id   String  @id @default(cuid())
+  name String  @unique // "PSA", "PCA", "BGS", "CGC", "ACE"
+  logo String?
+
+  listings        Listing[]
+  auctions        Auction[]
+  collectionItems CollectionItem[]
+  orderItems      OrderItem[]
+}
+
+// Remplace l'enum ProductType, trop rigide : specs §3/§12 parlent
+// d'"autres produits Pokémon présents dans le catalogue" — une nouvelle
+// catégorie (Tin, Pokébox, Deck...) doit pouvoir s'ajouter sans migration.
+model ProductCategory {
+  id   String @id @default(cuid())
+  slug String @unique // "card", "etb", "display", "booster", "coffret", ...
+  name String // "Carte", "ETB", "Display", ...
+
+  products Product[]
+}
+
+// ── Catalogue ──────────────────────────────────────────
+
+model Series {
+  id   String @id @default(cuid())
+  code String @unique // ex: "EV10"
+  name String // ex: "Rivalités Destinées"
+
+  products Product[]
+}
+
+model Product {
+  id         String          @id @default(cuid())
+  categoryId String
+  category   ProductCategory @relation(fields: [categoryId], references: [id])
+  name       String
+  seriesId   String?
+  series     Series?         @relation(fields: [seriesId], references: [id])
+  cardNumber String?
+  rarity     String?
+  tcgdexId   String?         @unique
+  imageUrl   String?
+  viewCount  Int             @default(0)
+  createdAt  DateTime        @default(now())
+
+  listings        Listing[]
+  auctions        Auction[]
+  collectionItems CollectionItem[]
+  orderItems      OrderItem[]
+
+  @@index([categoryId])
+  @@index([name])
+}
+
+// ── Offres de vente classiques ─────────────────────────
+
+model Listing {
+  id        String        @id @default(cuid())
+  productId String
+  product   Product       @relation(fields: [productId], references: [id])
+  sellerId  String
+  seller    User          @relation(fields: [sellerId], references: [id])
+  price     Decimal       @db.Decimal(10, 2)
+  quantity  Int           @default(1)
+  status    ListingStatus @default(ACTIVE)
+
+  // Caractéristiques d'exemplaire — toutes facultatives (specs §6-9)
+  state            CardState?
+  languageId       String?
+  language         Language?       @relation(fields: [languageId], references: [id])
+  holo             Boolean         @default(false)
+  firstEdition     Boolean         @default(false)
+  pokeball         Boolean         @default(false)
+  miscutMisprint   Boolean         @default(false)
+  stamp            Boolean         @default(false)
+  reverse          Boolean         @default(false)
+  graded           Boolean         @default(false)
+  gradingCompanyId String?
+  gradingCompany   GradingCompany? @relation(fields: [gradingCompanyId], references: [id])
+  gradingNote      String?
+  description      String?
+
+  createdAt DateTime @default(now())
+
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  conversations Conversation[]
+  priceOffers   PriceOffer[]
+
+  @@index([productId])
+  @@index([sellerId])
+  @@index([status])
+}
+
+// ── Enchères ────────────────────────────────────────────
+
+model Auction {
+  id           String        @id @default(cuid())
+  productId    String
+  product      Product       @relation(fields: [productId], references: [id])
+  sellerId     String
+  seller       User          @relation("AuctionSeller", fields: [sellerId], references: [id])
+  startPrice   Decimal       @db.Decimal(10, 2)
+  reservePrice Decimal?      @db.Decimal(10, 2)
+  currentPrice Decimal       @db.Decimal(10, 2)
+  photos       String[]      @default([])
+  status       AuctionStatus @default(ACTIVE)
+  endAt        DateTime
+
+  // Caractéristiques d'exemplaire — toutes facultatives
+  state            CardState?
+  languageId       String?
+  language         Language?       @relation(fields: [languageId], references: [id])
+  holo             Boolean         @default(false)
+  firstEdition     Boolean         @default(false)
+  pokeball         Boolean         @default(false)
+  miscutMisprint   Boolean         @default(false)
+  stamp            Boolean         @default(false)
+  reverse          Boolean         @default(false)
+  graded           Boolean         @default(false)
+  gradingCompanyId String?
+  gradingCompany   GradingCompany? @relation(fields: [gradingCompanyId], references: [id])
+  gradingNote      String?
+  description      String?
+
+  createdAt DateTime @default(now())
+
+  bids Bid[] @relation("AuctionBids")
+
+  // Clôture d'enchère → doit rejoindre le système de commandes (§44-45,
+  // §57-61) : le gagnant retrouve l'achat dans "Mes achats", le vendeur
+  // dans "Mes ventes", tous deux avec les mêmes statuts synchronisés.
+  winnerId     String?
+  winner       User?   @relation("AuctionWinner", fields: [winnerId], references: [id])
+  winningBidId String? @unique
+  winningBid   Bid?    @relation("WinningBid", fields: [winningBidId], references: [id])
+  order        Order?
+
+  conversations Conversation[]
+
+  @@index([productId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([endAt])
+}
+
+model Bid {
+  id        String   @id @default(cuid())
+  auctionId String
+  auction   Auction  @relation("AuctionBids", fields: [auctionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  wonAuction Auction? @relation("WinningBid")
+
+  @@index([auctionId])
+}
+
+// ── Collection personnelle ─────────────────────────────
+
+model CollectionItem {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(1)
+
+  state            CardState?
+  languageId       String?
+  language         Language?       @relation(fields: [languageId], references: [id])
+  holo             Boolean         @default(false)
+  firstEdition     Boolean         @default(false)
+  pokeball         Boolean         @default(false)
+  miscutMisprint   Boolean         @default(false)
+  stamp            Boolean         @default(false)
+  reverse          Boolean         @default(false)
+  graded           Boolean         @default(false)
+  gradingCompanyId String?
+  gradingCompany   GradingCompany? @relation(fields: [gradingCompanyId], references: [id])
+  gradingNote      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([productId])
+}
+
+// ── Panier / Commandes ─────────────────────────────────
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+}
+
+model Order {
+  id       String @id @default(cuid())
+  buyerId  String
+  buyer    User   @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId String
+  seller   User   @relation("SellerOrders", fields: [sellerId], references: [id])
+
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id])
+
+  shippingMethodId       String?
+  shippingMethod         ShippingMethod? @relation(fields: [shippingMethodId], references: [id])
+  shippingMethodSnapshot String? // nom au moment de la commande (le vendeur peut renommer/supprimer sa méthode ensuite)
+
+  // Une commande peut venir d'une enchère remportée plutôt que du panier (§44-45)
+  auctionId String?  @unique
+  auction   Auction? @relation(fields: [auctionId], references: [id])
+
+  status       OrderStatus @default(AWAITING_PAYMENT)
+  subtotal     Decimal     @db.Decimal(10, 2)
+  shippingCost Decimal     @default(0) @db.Decimal(10, 2)
+  total        Decimal     @db.Decimal(10, 2)
+  createdAt    DateTime    @default(now())
+
+  items         OrderItem[]
+  conversations Conversation[]
+  payment       Payment?
+  reviews       Review[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int      @default(1)
+
+  // Snapshot au moment de l'achat (le nom/prix peuvent changer ou l'offre
+  // être supprimée ensuite ; état/langue/gradation pointent vers des lookups
+  // stables donc pas besoin de dupliquer leur texte).
+  nameSnapshot  String
+  priceSnapshot Decimal @db.Decimal(10, 2)
+
+  state            CardState?
+  languageId       String?
+  language         Language?       @relation(fields: [languageId], references: [id])
+  holo             Boolean         @default(false)
+  firstEdition     Boolean         @default(false)
+  pokeball         Boolean         @default(false)
+  miscutMisprint   Boolean         @default(false)
+  stamp            Boolean         @default(false)
+  reverse          Boolean         @default(false)
+  graded           Boolean         @default(false)
+  gradingCompanyId String?
+  gradingCompany   GradingCompany? @relation(fields: [gradingCompanyId], references: [id])
+  gradingNote      String?
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// Représente le paiement lui-même (distinct du statut "PAID" de la commande) :
+// prestataire, identifiant de transaction, montant réellement débité — prêt
+// pour un vrai prestataire (Stripe...) plus tard sans re-modéliser Order.
+model Payment {
+  id              String         @id @default(cuid())
+  orderId         String         @unique
+  order           Order          @relation(fields: [orderId], references: [id])
+  provider        String         @default("mock")
+  transactionId   String?
+  amount          Decimal        @db.Decimal(10, 2)
+  status          PaymentStatus  @default(PENDING)
+  paymentMethodId String?
+  paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  paidAt          DateTime?
+  refundedAt      DateTime?
+  createdAt       DateTime       @default(now())
+}
+
+// ── Évaluations vendeur ─────────────────────────────────
+// Les compteurs affichés sur le profil public (§22) sont calculés depuis
+// cette table plutôt que stockés sur User, pour tracer qui a évalué quoi et
+// empêcher les doublons.
+
+model Review {
+  id           String       @id @default(cuid())
+  orderId      String
+  order        Order        @relation(fields: [orderId], references: [id])
+  authorId     String
+  author       User         @relation("ReviewsAuthored", fields: [authorId], references: [id])
+  targetUserId String
+  targetUser   User         @relation("ReviewsReceived", fields: [targetUserId], references: [id])
+  rating       ReviewRating
+  comment      String?
+  createdAt    DateTime     @default(now())
+
+  @@unique([orderId, authorId]) // une seule évaluation par auteur et par commande
+  @@index([targetUserId])
+}
+
+// ── Négociation de prix ─────────────────────────────────
+// Modèle dédié (plutôt qu'un simple Message) pour garantir qu'une offre
+// acceptée est liée à UN acheteur, UNE offre de vente, et ne peut être
+// utilisée qu'une fois (specs §29-30).
+
+model PriceOffer {
+  id        String           @id @default(cuid())
+  listingId String
+  listing   Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User             @relation("PriceOffersMade", fields: [buyerId], references: [id])
+  sellerId  String
+  seller    User             @relation("PriceOffersReceived", fields: [sellerId], references: [id])
+  amount    Decimal          @db.Decimal(10, 2)
+  status    PriceOfferStatus @default(PENDING)
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
+  expiresAt  DateTime?
+  usedAt     DateTime?
+
+  messages Message[]
+
+  @@index([listingId])
+  @@index([buyerId])
+  @@index([status])
+}
+
+// ── Messagerie ──────────────────────────────────────────
+
+model Conversation {
+  id        String   @id @default(cuid())
+  buyerId   String
+  buyer     User     @relation("BuyerConversations", fields: [buyerId], references: [id])
+  sellerId  String
+  seller    User     @relation("SellerConversations", fields: [sellerId], references: [id])
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id])
+  auctionId String?
+  auction   Auction? @relation(fields: [auctionId], references: [id])
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  createdAt DateTime @default(now())
+
+  messages    Message[]
+  priceOffers PriceOffer[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  type           MessageType  @default(TEXT)
+  content        String?
+  imageUrl       String?
+
+  // Référence d'affichage vers la négociation en cours (l'état vit dans PriceOffer)
+  priceOfferId String?
+  priceOffer   PriceOffer? @relation(fields: [priceOfferId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+}

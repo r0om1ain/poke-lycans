@@ -1,0 +1,11 @@
+import { api, toQuery } from './client.js';
+
+export const catalogApi = {
+  home: () => api.get('/api/catalog/home'),
+  search: (params) => api.get(`/api/catalog/search${toQuery(params)}`),
+  productDetail: (id) => api.get(`/api/catalog/products/${id}`),
+  series: () => api.get('/api/catalog/series'),
+  categories: () => api.get('/api/catalog/categories'),
+  languages: () => api.get('/api/catalog/languages'),
+  gradingCompanies: () => api.get('/api/catalog/grading-companies'),
+};

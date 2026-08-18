@@ -1,0 +1,9 @@
+[
+  { "tcgdexId": "sv10", "code": "EV10", "name": "Rivalités Destinées" },
+  { "tcgdexId": "sv08.5", "code": "EV08.5", "name": "Évolutions Prismatiques" },
+  { "tcgdexId": "sv08", "code": "EV08", "name": "Étincelles Déferlantes" },
+  { "tcgdexId": "sv04", "code": "EV04", "name": "Faille Paradoxe" },
+  { "tcgdexId": "sv03.5", "code": "EV03.5", "name": "151" },
+  { "tcgdexId": "swsh3", "code": "EB03", "name": "Ténèbres Embrasées" },
+  { "tcgdexId": "base1", "code": "BS", "name": "Set de Base" }
+]

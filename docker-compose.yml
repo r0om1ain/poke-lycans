@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tcgworld
+      POSTGRES_PASSWORD: tcgworld
+      POSTGRES_DB: tcgworld
+    ports:
+      - "5432:5432"
+    volumes:
+      - tcgworld_pgdata:/var/lib/postgresql/data
+
+volumes:
+  tcgworld_pgdata:
