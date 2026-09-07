@@ -4,3 +4,9 @@ build/
 .env
 *.log
 .DS_Store
+
+# .NET
+bin/
+obj/
+.vs/
+server/TcgWorld.Api/appsettings.Development.json

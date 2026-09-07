@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "etb-ev10",
+    "name": "ETB Rivalités Destinées",
+    "categorySlug": "etb",
+    "seriesCode": "EV10",
+    "wikiDomain": "www.pokepedia.fr",
+    "wikiFile": "Coffret_Dresseur_d'élite_Écarlate_et_Violet_Rivalités_Destinées.png"
+  },
+  {
+    "slug": "etb-ev08",
+    "name": "ETB Étincelles Déferlantes",
+    "categorySlug": "etb",
+    "seriesCode": "EV08",
+    "wikiDomain": "www.pokepedia.fr",
+    "wikiFile": "Coffret_Dresseur_d'élite_Écarlate_et_Violet_Étincelles_Déferlantes.png"
+  },
+  {
+    "slug": "etb-ev04",
+    "name": "ETB Faille Paradoxe",
+    "categorySlug": "etb",
+    "seriesCode": "EV04",
+    "wikiDomain": "www.pokepedia.fr",
+    "wikiFile": "Coffret_Dresseur_d'élite_Écarlate_et_Violet_Faille_Paradoxe.png"
+  },
+  {
+    "slug": "etb-ev03-5",
+    "name": "ETB 151",
+    "categorySlug": "etb",
+    "seriesCode": "EV03.5",
+    "wikiDomain": "www.pokepedia.fr",
+    "wikiFile": "Coffret_Dresseur_d'élite_Écarlate_et_Violet_151.png"
+  },
+  {
+    "slug": "etb-eb03",
+    "name": "ETB Ténèbres Embrasées",
+    "categorySlug": "etb",
+    "seriesCode": "EB03",
+    "wikiDomain": "www.pokepedia.fr",
+    "wikiFile": "Coffret_Dresseur_d'élite_Épée_et_Bouclier_Ténèbres_Embrasées.png"
+  },
+  {
+    "slug": "coffret-ev08-5",
+    "name": "Collection Super-Premium Évolutions Prismatiques",
+    "categorySlug": "coffret",
+    "seriesCode": "EV08.5",
+    "wikiDomain": "www.pokepedia.fr",
+    "wikiFile": "Collection_Super-Premium_Écarlate_et_Violet_Évolutions_Prismatiques.png"
+  },
+  {
+    "slug": "display-ev04",
+    "name": "Display Faille Paradoxe",
+    "categorySlug": "display",
+    "seriesCode": "EV04",
+    "wikiDomain": "archives.bulbagarden.net",
+    "wikiFile": "SV4_Booster_Display_Box.jpg"
+  },
+  {
+    "slug": "display-ev10",
+    "name": "Display Rivalités Destinées",
+    "categorySlug": "display",
+    "seriesCode": "EV10",
+    "wikiDomain": "archives.bulbagarden.net",
+    "wikiFile": "SV10_Booster_Display_Box.jpg"
+  },
+  {
+    "slug": "booster-bundle-ev04",
+    "name": "Lot de 6 Boosters Faille Paradoxe",
+    "categorySlug": "booster",
+    "seriesCode": "EV04",
+    "wikiDomain": "archives.bulbagarden.net",
+    "wikiFile": "SV4_Booster_Bundle.jpg"
+  }
+]

@@ -3,16 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "server",
     "client"
   ],
   "scripts": {
-    "dev": "concurrently -k -n API,WEB -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev": "concurrently -k -n API,WEB -c blue,magenta \"dotnet watch run --project server/TcgWorld.Api\" \"npm run dev -w client\"",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "prisma:migrate": "npm run prisma:migrate -w server",
-    "prisma:generate": "npm run prisma:generate -w server",
-    "seed": "npm run seed -w server"
+    "ef:migrate": "dotnet ef database update --project server/TcgWorld.Api",
+    "seed": "dotnet run --project server/TcgWorld.Api -- seed"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
