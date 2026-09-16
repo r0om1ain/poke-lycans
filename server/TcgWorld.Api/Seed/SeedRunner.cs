@@ -87,8 +87,10 @@ public class SeedRunner(AppDbContext db, IHttpClientFactory httpFactory, IWebHos
             {
                 var resp = await http.GetStringAsync($"https://api.tcgdex.net/v2/fr/sets/{set.TcgdexId}");
                 using var doc = JsonDocument.Parse(resp);
+                // .Clone() : les JsonElement d'un JsonDocument ne sont valides que tant que
+                // celui-ci est vivant — la liste doit survivre à la sortie du bloc `using`.
                 if (doc.RootElement.TryGetProperty("cards", out var cardsEl))
-                    cartesJson = [.. cardsEl.EnumerateArray()];
+                    cartesJson = [.. cardsEl.EnumerateArray().Select(e => e.Clone())];
             }
             catch (Exception ex)
             {
