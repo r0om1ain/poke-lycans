@@ -10,3 +10,8 @@ bin/
 obj/
 .vs/
 server/TcgWorld.Api/appsettings.Development.json
+
+# Data platform
+__pycache__/
+*.pyc
+data-platform/.venv/

@@ -25,6 +25,7 @@ builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<CollectionService>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<MessagingService>();
+builder.Services.AddScoped<AnalyticsExportService>();
 builder.Services.AddScoped<UploadHelper>();
 builder.Services.AddScoped<TcgWorld.Api.Seed.SeedRunner>();
 builder.Services.AddHttpClient();
@@ -79,7 +80,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
             return Task.CompletedTask;
         },
     };
-});
+}).AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, AnalyticsBearerAuthHandler>(
+    AnalyticsBearerAuthHandler.SchemeName, null);
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
