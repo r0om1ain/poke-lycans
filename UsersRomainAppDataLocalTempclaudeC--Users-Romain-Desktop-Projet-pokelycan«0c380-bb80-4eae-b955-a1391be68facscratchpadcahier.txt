@@ -1,0 +1,1102 @@
+Cahier des charges — Projet A : MarketPlace Analytics
+Sayf BEJAOUI
+1385900.00000000
+Sayf BEJAOUI
+0x01010064BF541310A80149A1822100B45134BD
+Cahier des charges — Projet A : MarketPlace Analytics
+Version :
+3.0 (avril 2026)
+Pitch
+:
+pitch.md
+·
+Règles communes
+:
+Documentation commune.html
+1. Contexte
+Vous êtes Data Engineer dans
+Maelys Marketplace
+, une marketplace e-commerce française qui met en relation des vendeurs indépendants (artisans, marques DNVB, revendeurs) et des consommateurs finaux. Maelys prend une commission de 12% sur chaque vente.
+Chiffres (fictifs) :
+2 400 vendeurs actifs · 180 000 produits · ~8 500 commandes/jour
+CA mensuel ~4.2 M€
+75 personnes en interne dont 1 analyste qui passe
+2 jours par semaine
+à extraire à la main les données du backoffice pour produire des rapports Excel
+Le besoin
+Le
+CEO
+veut un dashboard hebdomadaire avec les KPIs clés (top vendeurs, CA par catégorie, panier moyen). L'
+équipe finance
+a besoin de données fiables pour la clôture mensuelle et la facturation des commissions. Le
+responsable catalogue
+veut détecter les anomalies (drop de ventes, prix suspects).
+Aujourd'hui :
+tout est manuel
+, les rapports sont en retard, les erreurs de copier-coller sont fréquentes, et l'analyste passe 40% de son temps sur de l'extraction au lieu de faire de l'analyse.
+Votre mission
+Construire en 2 jours un
+MVP de plateforme data
+qui :
+Ingère automatiquement les données depuis l'API du backoffice
+Les stocke dans un Data Warehouse propre (modélisation dimensionnelle)
+Expose des KPIs lisibles via un outil BI (Metabase)
+Détecte les anomalies commerciales basiques
+Vous êtes l'équipe Data nouvellement recrutée. Aucune infrastructure data n'existe — vous partez de zéro. Le code doit être maintenable, testé, et reproductible (Docker Compose).
+2. Objectifs pédagogiques
+À la fin du projet, vous saurez :
+🟢 Construire un pipeline ELT idempotent end-to-end avec Airflow 3.1.8
+🟢 Implémenter un Custom Hook pour une API REST authentifiée
+🟢 Modéliser un schéma dimensionnel en étoile (Kimball)
+🟢 Utiliser MinIO comme zone de "raw layer" (data lake S3-compatible)
+🟢 Exposer des KPIs business via Metabase
+🟢 Brancher Prometheus + Grafana pour la supervision technique du pipeline (bonus)
+🟢 Tester un pipeline avec pytest
+3. Architecture cible
+3.1 Vue d'ensemble
+flowchart LR
+subgraph t_src["Sources"]
+t_api[("API Marketplace
+Flask simulee")]
+end
+subgraph t_orch["Orchestration"]
+t_hook["MarketplaceAPIHook"]
+t_airflow[["Airflow 3.1.8
+4-5 DAGs"]]
+end
+subgraph t_store["Stockage"]
+t_minio[("MinIO
+raw partition dt=")]
+t_pg[("PostgreSQL 18
+staging / dwh / analytics")]
+end
+subgraph t_serv["Serving BI"]
+t_meta["Metabase 59
+4 dashboards"]
+end
+subgraph t_obs["Observabilite bonus"]
+t_prom[("Prometheus")]
+t_graf["Grafana"]
+end
+t_api --> t_hook
+t_hook --> t_airflow
+t_airflow -- "upload raw JSON" --> t_minio
+t_airflow -- "load + transform" --> t_pg
+t_pg --> t_meta
+t_airflow -. "metrics StatsD" .-> t_prom
+t_pg -. "postgres-exporter" .-> t_prom
+t_prom --> t_graf
+style t_airflow fill:#4a90d9,color:#fff
+style t_pg fill:#f5a623,color:#000
+style t_meta fill:#509ee3,color:#fff
+style t_prom fill:#e6522c,color:#fff
+3.2 Flux d'un pipeline run
+sequenceDiagram
+participant S as Scheduler
+participant H as MarketplaceAPIHook
+participant A as API Marketplace
+participant M as MinIO
+participant P as PostgreSQL
+participant MB as Metabase
+S->>H: declenche extract (date={{ ds }})
+H->>A: GET /orders?date=...
+A-->>H: JSON N commandes
+H->>M: PUT raw/orders/dt=.../data.json
+H->>P: INSERT staging.orders (idempotent)
+S->>P: DELETE + INSERT dwh.fact_orders WHERE dt = ...
+S->>P: REFRESH analytics.daily_summary
+MB->>P: SELECT pour le dashboard
+3.3 Pourquoi cette architecture
+MinIO comme raw layer
+: conserver le JSON brut en archive permet de
+rejouer
+un pipeline si la transformation a un bug, sans devoir re-appeler l'API source. C'est le pattern "data lake first".
+3 schémas PostgreSQL séparés
+:
+staging
+(données brutes typées),
+dwh
+(modèle dimensionnel propre),
+analytics
+(agrégations pré-calculées pour les dashboards). C'est plus propre qu'un seul schéma fourre-tout.
+Metabase plutôt que Superset
+: plus simple à mettre en place, suffisant pour 4 dashboards, et l'install Docker est triviale.
+Pas de Spark / dbt
+: Airflow gère lui-même les transformations SQL via
+PostgresHook.run()
+. Pour 8 500 commandes/jour, c'est largement suffisant.
+4. Stack technique
+Versions et tags Docker : voir
+Documentation commune.html
+4.1 Services Docker Compose
+Service
+Port
+Volume
+Rôle
+airflow-apiserver
+8080
+—
+UI + API REST
+airflow-scheduler
+—
+—
+Scheduler
+airflow-dag-processor
+—
+—
+DAG parsing
+airflow-triggerer
+—
+—
+Deferrable ops
+airflow-worker
+—
+—
+Exécution tasks
+postgres-airflow
+5432
+pg-airflow-data
+Metadata DB
+postgres-dwh
+5433
+pg-dwh-data
+Data Warehouse
+redis
+6379
+—
+Celery broker
+minio
+9000/9001
+minio-data
+Object storage
+minio-init
+—
+—
+Crée le bucket
+data-lake
+au démarrage
+api-marketplace
+5000
+—
+API Flask simulée
+metabase
+3000
+metabase-data
+BI (à ajouter au J2)
+prometheus
+(bonus)
+9090
+prometheus-data
+Supervision
+grafana
+(bonus)
+3001
+grafana-data
+Dashboards techniques
+postgres-exporter
+(bonus)
+9187
+—
+Métriques PostgreSQL
+statsd-exporter
+(bonus)
+9102
+—
+Métriques Airflow
+4.2 Comment lire le
+docker-compose.yaml
+Le fichier que vous trouverez dans le kit a une structure standard :
+x-airflow-common
+:
+&airflow-common
+# Bloc partagé entre tous les services Airflow
+image
+:
+apache/airflow:3.1.8
+environment
+:
+&airflow-common-env
+# Variables d'env communes
+AIRFLOW__CORE__EXECUTOR
+:
+CeleryExecutor
+...
+volumes
+:
+-
+./dags:/opt/airflow/dags
+# Vos DAGs sont montés ici
+-
+./plugins:/opt/airflow/plugins
+# Vos hooks et operators custom
+-
+./logs:/opt/airflow/logs
+services
+:
+airflow-scheduler
+:
+&lt;&lt;
+:
+*airflow-common
+# Hérite du bloc commun
+command
+:
+scheduler
+...
+🟠
+Si vous modifiez le bloc
+x-airflow-common
+, tous les services Airflow doivent être redémarrés ensemble (
+docker compose up -d --force-recreate
+).
+4.3 Commandes Docker indispensables
+# Demarrage initial (premier run, cree volumes + init DB)
+docker
+compose
+up
+-d
+# Attendre ~60 secondes que tous les services soient healthy
+# Verifier l'etat des services
+docker
+compose
+ps
+# Suivre les logs d'un service en temps reel
+docker
+compose
+logs
+-f
+airflow-scheduler
+--tail
+=
+50
+# Entrer dans un conteneur (debugging)
+docker
+compose
+exec
+airflow-worker
+bash
+# Tester un DAG en mode test (sans passer par le scheduler)
+docker
+compose
+exec
+airflow-worker
+airflow
+dags
+test
+marketplace_orders_ingest_daily
+2026
+-04-07
+# Recreer un service apres modification du docker-compose.yaml
+docker
+compose
+up
+-d
+--force-recreate
+metabase
+# Tout arreter (les volumes sont conserves)
+docker
+compose
+down
+# Reset complet (volumes supprimes, attention aux donnees)
+docker
+compose
+down
+-v
+5. API Marketplace (fournie)
+L'API Flask simulée tourne dans un conteneur (
+api-marketplace
+) et expose ces endpoints avec authentification Bearer (
+formation-token-2026
+) :
+Méthode
+Endpoint
+Paramètres
+Retour
+Notes
+GET
+/health
+—
+{status, version}
+Pas d'auth requise
+GET
+/orders
+date=YYYY-MM-DD
+liste de commandes
+Auth requise
+GET
+/sellers
+limit
+liste de vendeurs
+Auth requise
+GET
+/products
+—
+catalogue
+Auth requise
+GET
+/customers
+limit
+liste clients
+Auth requise
+5.1 Pourquoi cette API est "déterministe"
+L'API génère ses données à partir d'un
+hash de la date
+:
+seed = md5(date)
+. Conséquence :
+un même date = un même résultat
+. C'est ce qui vous permet de tester l'idempotence (rejouer un run et vérifier que les données sont identiques).
+5.2 Tester l'API à la main
+# Health check
+curl
+http://localhost:5000/health
+# Avec authentification
+curl
+-H
+&quot;Authorization: Bearer formation-token-2026&quot;
+\
+&quot;http://localhost:5000/orders?date=2026-04-07&quot;
+🟠 Si vous oubliez le header
+Authorization
+, l'API renvoie un
+401 Unauthorized
+. C'est volontaire — pour vous forcer à utiliser une
+Connection
+Airflow plutôt que de hardcoder le token.
+6. User stories
+ID
+En tant que...
+Je veux...
+Priorité
+US-01
+CEO
+voir le CA total par jour sur 30 jours
+🟠 Must
+US-02
+CEO
+connaître le top 10 vendeurs par revenu
+🟠 Must
+US-03
+Finance
+avoir un récapitulatif des commissions par jour
+🟠 Must
+US-04
+Responsable catalogue
+voir la répartition CA par catégorie
+🟡 Should
+US-05
+Analyste
+être alerté si le CA du jour &lt; 70% de la moyenne 7j
+🟡 Should
+US-06
+Analyste
+rejouer le pipeline sur une date passée
+🔵 Could
+US-07
+Ops
+superviser l'état du pipeline (alerte si DAG fail)
+🔵 Could
+7. Périmètre — MVP vs Bonus
+7.1 🟠 Must have (MVP — obligatoire)
+1 Custom Hook
+:
+MarketplaceAPIHook
+avec méthodes pour
+/orders
+,
+/sellers
+,
+/products
+Pipeline ELT principal
+:
+Extract via le Hook
+Upload raw JSON dans MinIO (partition
+dt=YYYY-MM-DD
+)
+Load dans
+staging.orders
+Transform vers
+dwh.fact_orders
+(idempotent — DELETE + INSERT par partition)
+Modèle dimensionnel simple
+: au moins
+dim_seller
+,
+dim_product
+,
+fact_orders
+2 dashboards Metabase
+: CA journalier + top vendeurs
+Tests pytest
+≥ 3 (dont vérification idempotence)
+7.2 🟡 Should have (bonus +5 pts)
+Custom Operator
+DataQualityOperator
+avec 3 règles configurables (not null, not empty, pas de future date)
+Branching
+dans le DAG : si DQ KO → tâche d'alerte au lieu du load DWH
+2 dashboards Metabase supplémentaires
+(commissions, catégories)
+7.3 🔵 Could have (bonus +10 pts)
+Stack observabilité Prometheus + Grafana
+(voir §10 et
+Documentation commune.html
+)
+DAG d'anomaly detection avec écart à la moyenne mobile 7j
+Backfill manuel sur 7 jours historiques documenté
+Tests pytest avec mock de la DB
+7.4 🔴 Won't have (ne pas chercher à faire)
+Dimensions type SCD2 (over-engineering pour ce projet)
+CI/CD GitHub Actions
+Migration vers cloud
+🟠
+Règle d'or
+: livrer le MVP à 100%
+avant
+toute tentative de bonus. Un MVP propre et testé &gt; un projet ambitieux bancal.
+8. Modèle de données (à concevoir)
+8.1 Contraintes
+Vous devez concevoir vous-mêmes le schéma
+en étoile
+(Kimball). Les contraintes :
+Schémas
+staging
+,
+dwh
+,
+analytics
+séparés
+Au moins
+3 dimensions
++
+1 table de faits
+Les dimensions doivent avoir une
+PRIMARY KEY
+La table de faits doit avoir des
+FOREIGN KEY
+vers les dimensions
+Au moins
+1 table d'agrégation
+dans
+analytics
+8.2 Pourquoi un schéma en étoile
+Performances
+: les jointures dim ↔ fait sont optimisées par PostgreSQL
+Lisibilité
+: un analyste comprend immédiatement la structure
+Reporting
+: Metabase est conçu pour ce modèle (auto-detection des relations)
+Évolutivité
+: ajouter une nouvelle dimension ne casse rien
+8.3 Conseil de design
+Commencez simple :
+dim_seller (id, name, country, joined_date)
+dim_product (id, name, category, seller_id)
+dim_date (dt, year, month, day_of_week)
+fact_orders (order_id, dt, seller_id, product_id, quantity, total, commission)
+analytics.daily_summary (dt, total_orders, total_revenue, top_seller_id)
+🔵
+Conseil
+: ne sur-modélisez pas. 4 tables propres valent mieux que 12 tables bancales.
+Livrable : un fichier
+init-db/schema.sql
+avec vos
+CREATE SCHEMA
+et
+CREATE TABLE
+.
+9. Spécifications techniques
+9.1 DAGs attendus (noms suggérés)
+DAG
+Schedule
+Rôle
+marketplace_dims_refresh_daily
+@daily
+Refresh
+dim_seller
+,
+dim_product
+marketplace_orders_ingest_daily
+@daily
+Pipeline principal : extract → raw → staging → dwh
+marketplace_analytics_aggregate_daily
+Asset-scheduled
+Build des tables analytics
+marketplace_anomaly_detect_daily
+(bonus)
+@daily
+Détection anomalies CA
+9.2 Custom Hook (à designer)
+Le
+MarketplaceAPIHook
+doit :
+Hériter de
+BaseHook
+Lire la
+Connection Airflow
+marketplace_api
+(host = URL, password = token Bearer)
+Exposer au minimum :
+get_orders(date)
+,
+get_sellers()
+,
+get_products()
+Gérer les erreurs HTTP (timeout, 5xx) avec un retry
+Être testable unitairement (mock de
+requests
+)
+🔵 Vous concevez la signature et l'implémentation. Ne cherchez pas un template tout prêt — c'est l'exercice.
+9.3 Pattern d'idempotence (obligatoire)
+Pour chaque run daté
+{{ ds }}
+, votre transformation
+staging → dwh
+doit faire :
+BEGIN
+;
+DELETE
+FROM
+dwh
+.
+fact_orders
+WHERE
+dt
+=
+'{{ ds }}'
+;
+INSERT
+INTO
+dwh
+.
+fact_orders
+SELECT
+...
+FROM
+staging
+.
+orders
+WHERE
+dt
+=
+'{{ ds }}'
+;
+COMMIT
+;
+Pourquoi
+DELETE + INSERT
+plutôt qu'un
+MERGE
+/
+UPSERT
+?
+Parce que c'est :
+Plus simple (pas de gestion de conflit ligne par ligne)
+Plus performant pour des batches &gt; 1000 lignes
+Plus facile à débugger (la table est dans un état connu après chaque run)
+Règle absolue
+: rejouer un run avec la même date = même résultat en base.
+Non négociable
+.
+10. Metabase
+10.1 Configuration Docker
+Service à
+ajouter dans le
+docker-compose.yaml
+:
+metabase
+:
+image
+:
+metabase/metabase:v0.59.6.1
+ports
+:
+-
+&quot;3000:3000&quot;
+environment
+:
+MB_DB_TYPE
+:
+h2
+MB_DB_FILE
+:
+/metabase-data/metabase.db
+volumes
+:
+-
+metabase-data:/metabase-data
+depends_on
+:
+-
+postgres-dwh
+networks
+:
+-
+airflow-net
+volumes
+:
+metabase-data
+:
+🟠
+Le volume
+metabase-data
+est CRUCIAL.
+Sans lui, vos dashboards seront perdus à chaque
+docker compose down -v
+. Si vous voulez une persistance encore meilleure, utilisez PostgreSQL au lieu de H2 comme metadata DB de Metabase (plus complexe mais production-grade).
+10.2 Premier login
+Aller sur
+http://localhost:3000
+Créer un compte admin (formation :
+admin@maelys.local
+/
+Admin2026!
+)
+Ajouter une source de données :
+Type :
+PostgreSQL
+Host :
+postgres-dwh
+(nom Docker, pas
+localhost
+!)
+Port :
+5432
+(port
+interne
+, pas
+5433
+)
+Database :
+dwh
+Username / password : ceux du
+.env
+10.3 Dashboards (MVP : 2 minimum)
+Dashboard 1 — Executive Summary
+KPI : CA total aujourd'hui (Big Number)
+Line chart : CA des 30 derniers jours
+Bar chart : Top 5 vendeurs du jour
+Dashboard 2 — Top Sellers
+Bar chart : Top 10 vendeurs du mois
+Line chart : Évolution du CA des top 3 sur 30 jours
+Table : Liste des vendeurs inactifs (&gt; 7 jours sans vente)
+🔵
+Conseil
+: les questions Metabase peuvent être créées en
+mode visuel
+(sans SQL) ou via l'
+éditeur SQL natif
+. Pour les KPIs simples, le mode visuel suffit. Pour les agrégations complexes, écrivez du SQL — c'est plus rapide.
+11. Découpage du projet
+11.1 — Construire le pipeline ELT
+L'objectif de la 1ere partie est d'avoir un
+pipeline qui tourne de bout en bout
+, même minimaliste. À la fin de la journée, vous devez pouvoir déclencher un DAG dans l'UI Airflow et constater que des données arrivent dans
+dwh.fact_orders
+.
+Étapes recommandées dans l'ordre :
+Démarrer le stack
+(
+docker compose up -d
+) et vérifier que tous les services sont healthy. C'est le bon moment pour explorer l'UI Airflow et les services PostgreSQL/MinIO.
+Tester l'API à la main
+avec
+curl
+pour comprendre son format de retour. C'est plus rapide que de débugger un DAG qui appelle une API qu'on ne connaît pas.
+Concevoir le modèle dimensionnel
+sur papier ou Mermaid avant d'écrire du SQL. Identifier les dimensions et les faits, puis écrire le
+init-db/schema.sql
+. Lancez-le manuellement avec
+psql
+pour vérifier qu'il passe.
+Implémenter le
+MarketplaceAPIHook
+: c'est la pierre angulaire de tout le pipeline. Encapsulez l'auth Bearer (lue depuis la
+Connection
+) et exposez les méthodes
+get_orders
+,
+get_sellers
+,
+get_products
+. Testez-le isolément via un script Python avant de l'intégrer dans un DAG.
+Écrire le DAG d'ingestion étape par étape
+: commencez par une seule task qui extract et imprime le résultat. Une fois que ça marche, ajoutez l'upload MinIO (via
+S3Hook
+), puis le load dans
+staging.orders
+(via
+PostgresHook
+). Ne sautez pas d'étape — chaque task doit être validée individuellement avant de passer à la suivante.
+Implémenter la transformation
+staging → dwh
+avec le
+pattern idempotent obligatoire
+(DELETE + INSERT par partition
+dt = {{ ds }}
+).
+Tester l'idempotence
+: rejouer 3 fois le même run et vérifier que
+COUNT(*)
+reste identique avec
+psql
+. C'est la preuve que votre pipeline est fiable.
+🟢
+Objectif
+: pipeline principal qui tourne, idempotence prouvée, données visibles dans
+dwh.fact_orders
+. Premier commit Git poussé.
+🟠
+Conseil
+: ne sous-estimez pas le temps de design du modèle dimensionnel et du Hook. Bâcler ces 2 étapes au début vous coûtera 2x plus de temps en debug ensuite.
+🟡
+En cas de retard
+: sacrifiez le 2ème DAG (refresh dimensions). Concentrez-vous sur le pipeline principal de bout en bout.
+11.2 — Analytics, dashboards, observabilité
+La deuxième partie est dédié à
+l'exposition des données
+via Metabase, à la qualité du livrable (tests, doc), et
+éventuellement
+à la stack d'observabilité Prometheus/Grafana en bonus.
+Étapes recommandées dans l'ordre :
+Construire les tables d'agrégation
+dans le schéma
+analytics
+. Réfléchissez à ce qui est vraiment utile pour les dashboards :
+daily_summary
+,
+seller_daily
+,
+category_daily
+. Un DAG dédié peut s'en charger.
+Ajouter Metabase au
+docker-compose.yaml
+avec un
+volume nommé
+pour la persistance (sinon vous perdrez tout au prochain
+docker compose down -v
+).
+Configurer la connexion Metabase → PostgreSQL DWH
+. Attention : le host est
+postgres-dwh
+(nom Docker), pas
+localhost
+, et le port interne est
+5432
+.
+Créer les 2 dashboards minimum
+(Executive Summary + Top Sellers). Privilégiez la clarté à l'exhaustivité — un dashboard simple et lisible vaut mieux qu'un dashboard chargé.
+Écrire les tests pytest
+(au moins 3) : import sans erreur,
+catchup=False
+, structure du DAG principal. Lancez-les via
+docker compose exec airflow-worker pytest tests/ -v
+.
+Finaliser le README
+avec le schéma Mermaid de l'architecture, les instructions de lancement et les choix techniques justifiés.
+Bonus si avance
+: ajouter Prometheus + Grafana + postgres-exporter (voir §13). Importer le dashboard Grafana ID 11010 (Airflow Cluster).
+🟢
+Objectifs :
+: 2 dashboards Metabase fonctionnels, tests qui passent, README complet
+🟠
+Conseil
+: commencez la doc et les tests
+en parallèle
+du code, pas à la fin. Un README à moitié écrit en cours de route est plus efficace qu'un README rédigé en panique à 16h59.
+12. Critères d'acceptation
+12.1 Definition of Done
+Voir
+Documentation commune.html
+, plus spécifique à ce projet :
+marketplace_orders_ingest_daily
+tourne en success
+dwh.fact_orders
+contient des données pour au moins 1 date
+Rejouer le même run 2 fois = même
+COUNT(*)
+dans
+dwh.fact_orders
+Metabase affiche au moins 2 dashboards avec données réelles
+Au moins 3 tests pytest passent
+README contient un schéma Mermaid et les instructions de lancement
+12.2 Tests pytest minimum
+# tests/test_dags.py
+def
+test_no_import_errors
+(
+dagbag
+):
+...
+def
+test_all_dags_catchup_false
+(
+dagbag
+):
+...
+def
+test_marketplace_ingest_has_idempotent_transform
+(
+dagbag
+):
+...
+12.3 Test manuel d'idempotence (que le formateur exécutera)
+# Run 1
+docker
+compose
+exec
+airflow-worker
+airflow
+dags
+test
+marketplace_orders_ingest_daily
+2026
+-04-07
+docker
+compose
+exec
+postgres-dwh
+psql
+-U
+dwh_user
+-d
+dwh
+\
+-c
+&quot;SELECT COUNT(*) FROM dwh.fact_orders WHERE dt='2026-04-07';&quot;
+# → N lignes
+# Run 2 (doit donner le meme COUNT)
+docker
+compose
+exec
+airflow-worker
+airflow
+dags
+test
+marketplace_orders_ingest_daily
+2026
+-04-07
+docker
+compose
+exec
+postgres-dwh
+psql
+-U
+dwh_user
+-d
+dwh
+\
+-c
+&quot;SELECT COUNT(*) FROM dwh.fact_orders WHERE dt='2026-04-07';&quot;
+# → toujours N lignes (PAS 2*N)
+13. Observabilité (bonus)
+Si vous avez fini le MVP en avance, ajoutez la
+stack Prometheus + Grafana + exporters
+. C'est ce qui transforme un projet "ça marche sur ma machine" en projet "production-ready".
+13.1 Quoi installer
+Voir
+Documentation commune.html
+pour le docker-compose complet, la config Prometheus, et les commandes de vérification.
+Pour ce projet, les composants pertinents sont :
+prometheus
+: scraper de métriques
+grafana
+: dashboards (mapper sur
+port 3001
+car 3000 est pris par Metabase)
+statsd-exporter
+: convertit les métriques StatsD d'Airflow en format Prometheus
+postgres-exporter
+: métriques PostgreSQL (connexions, requêtes lentes, locks)
+13.2 Activer les métriques Airflow
+Ajouter ces variables d'env dans
+x-airflow-common
+:
+AIRFLOW__METRICS__STATSD_ON
+:
+&quot;True&quot;
+AIRFLOW__METRICS__STATSD_HOST
+:
+statsd-exporter
+AIRFLOW__METRICS__STATSD_PORT
+:
+&quot;9125&quot;
+AIRFLOW__METRICS__STATSD_PREFIX
+:
+airflow
+Puis
+docker compose up -d --force-recreate
+.
+13.3 Dashboards Grafana à importer
+Aller dans Grafana (
+http://localhost:3001
+,
+admin/admin
+) →
+Dashboards
+→
+Import
+→ coller l'ID :
+Dashboard
+ID
+Couvre
+Airflow Cluster
+11010
+Métriques scheduler, tasks, DAGs
+PostgreSQL Database
+9628
+Connexions, requêtes, locks
+14. Grille d'évaluation (100 pts)
+Voir
+Documentation commune.html
+.
+Spécifiques au projet A :
+Les
+2 dashboards Metabase
+comptent pour 10 pts dans "Pipeline principal fonctionnel"
+Les
+dashboards supplémentaires
+(bonus Should) : +5 pts
+Le
+DAG d'anomaly detection
+(bonus Could) : +5 pts
+La
+stack observabilité Prometheus/Grafana
+(bonus Could) : +10 pts
+15. Pièges spécifiques au projet A
+15.1 Pièges communs
+Voir
+Documentation commune.html
+.
+15.2 Pièges Metabase
+Piège
+Symptôme
+Solution
+🔴 Perte des dashboards au
+down -v
+Tout disparaît
+Volume nommé
+metabase-data
+dans docker-compose
+🔴 Connexion à PostgreSQL wrong
+"Cannot connect"
+Host =
+postgres-dwh
+(nom Docker), port
+interne
+5432
+🟡 Premier démarrage lent
+~60s de setup initial
+Normal, Metabase initialise sa DB H2
+🟡 Conflit de port avec Grafana
+"Bind failed" sur 3000
+Mapper Grafana sur
+3001:3000
+15.3 Pièges Pipeline ELT
+Piège
+Symptôme
+Solution
+🔴 INSERT sans DELETE préalable
+Doublons à chaque run
+Utiliser le pattern
+DELETE + INSERT
+par partition
+dt
+🔴 Date hardcodée dans le SQL
+Le run ignore
+{{ ds }}
+Utiliser les
+macros Jinja
+Airflow (
+{{ ds }}
+,
+{{ ds_nodash }}
+)
+🔴 Token API en dur dans le code
+Détecté en code review
+Toujours via
+Connection.password
+🟡
+staging.orders
+qui grossit indéfiniment
+Disque qui se remplit
+Truncate / partition par
+dt
+à nettoyer périodiquement
+16. Ressources
+16.1 Documentation
+🔵
+Metabase Docker
+🔵
+Metabase SQL Questions
+🔵
+Metabase Dashboards
+🔵
+Airflow PostgresHook
+🔵
+Airflow S3Hook
+🔵
+PostgreSQL 18 Docs
+16.2 Bonnes pratiques
+🟠
+Kimball Dimensional Modeling (intro)
+🟠
+Astronomer — DAG Best Practices
+🟠
+Airflow — Macros et Templates Jinja
+16.3 Outils Docker / debug
+🟢
+lazydocker
+— TUI pour Docker
+🟢
+ctop
+— top pour containers
+🟢
+pgcli
+— client PostgreSQL avec autocomplétion
+16.4 Pour aller plus loin
+🟠
+dbt Core
+— alternative à du SQL Airflow pour les transformations
+🟠
+Apache Superset
+— alternative à Metabase, plus puissant mais plus complexe
+🟠
+Great Expectations
+— framework de data quality plus avancé que votre
+DataQualityOperator
+17. FAQ
+Q : On peut utiliser Superset à la place de Metabase ?
+R : Oui, à vos risques. Superset est plus puissant mais plus complexe. Documentez le choix dans le README. Pas de pénalité, pas de bonus.
+Q : On n'a pas le temps pour les 2 dashboards Metabase, on peut skipper ?
+R : Un seul dashboard avec 3 visualisations est acceptable comme MVP minimal. Mais c'est risqué — ça pèsera sur la note.
+Q : Le DataQualityOperator est-il obligatoire ?
+R : Non, c'est un bonus (Should). Concentrez-vous sur le MVP d'abord.
+Q : On peut ajouter dbt pour les transformations ?
+R : Hors scope pour 14h. Mentionnez-le dans le README comme "ce qu'on ferait avec plus de temps".
+Q : Le bonus observabilité (Prometheus/Grafana) est-il vraiment réaliste en 14h ?
+R : Si le MVP est fini à 14h le J2, oui : ~2h pour ajouter la stack et importer le dashboard 11010. Si vous galérez sur le MVP,
+n'y allez pas
+.
+Q : Comment on accède à PostgreSQL DWH depuis l'extérieur du conteneur ?
+R : Le port
+5433
+est exposé sur l'hôte. Depuis votre machine :
+psql -h localhost -p 5433 -U dwh_user -d dwh
+. Depuis un autre conteneur :
+psql -h postgres-dwh -p 5432 ...
+.
+Q : Que faire si MinIO n'a pas créé le bucket ?
+R : Aller dans MinIO Console (
+http://localhost:9001
+, login
+minio_admin
+/
+minio_password_2026
+) et créer manuellement le bucket
+data-lake
+. Ou exécuter
+docker compose restart minio-init
+.
+🟢
+Objectif final : un pipeline simple qui tourne, idempotent, avec 2 dashboards Metabase lisibles.

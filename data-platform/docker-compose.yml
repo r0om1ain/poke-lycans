@@ -62,7 +62,7 @@ services:
       MB_DB_TYPE: h2
       MB_DB_FILE: /metabase-data/metabase.db
     volumes:
-      - metabase-data:/metabase-data
+      - metabase-data-v2:/metabase-data
     depends_on:
       - postgres-dwh
     networks:
@@ -113,6 +113,6 @@ networks:
 volumes:
   pg-dwh-data:
   minio-data:
-  metabase-data:
+  metabase-data-v2:
   prometheus-data:
   grafana-data:
